@@ -25,7 +25,6 @@ class MainWindow(QMainWindow):
         self.layout = QVBoxLayout(self.central_widget)
 
         self.tabs = QTabWidget(self.central_widget)
-        self.setup_theme_switcher()
         self.layout.addWidget(self.tabs)
 
         self.setup_search_tab()
@@ -36,7 +35,7 @@ class MainWindow(QMainWindow):
         if self.current_theme == "light":
             self.setStyleSheet("""
                 QMainWindow { background-color: #f0f0f0; }
-                QTabWidget::pane { border: 1px solid #cccccc; background-color: #ffffff; }
+                QTabWidget::pane { border: 1px solid #cccccc; background-color: #ffffff; color: #000000; }
                 QTabBar::tab { background-color: #e0e0e0; padding: 8px 16px; margin-right: 2px; }
                 QTabBar::tab:selected { background-color: #ffffff; border-bottom: 2px solid #4a86e8; }
                 QPushButton { background-color: #4a86e8; color: white; padding: 8px 16px; border: none; border-radius: 4px; }
@@ -47,7 +46,7 @@ class MainWindow(QMainWindow):
         else:
             self.setStyleSheet("""
                 QMainWindow { background-color: #2e2e2e; }
-                QTabWidget::pane { border: 1px solid #444444; background-color: #3c3c3c; }
+                QTabWidget::pane { border: 1px solid #444444; background-color: #3c3c3c; color: #e0e0e0; }
                 QTabBar::tab { background-color: #4a4a4a; padding: 8px 16px; margin-right: 2px; }
                 QTabBar::tab:selected { background-color: #3c3c3c; border-bottom: 2px solid #76a9ea; }
                 QPushButton { background-color: #76a9ea; color: white; padding: 8px 16px; border: none; border-radius: 4px; }
@@ -55,15 +54,6 @@ class MainWindow(QMainWindow):
                 QLineEdit, QComboBox { padding: 6px; border: 1px solid #444444; border-radius: 4px; }
                 QListWidget { border: 1px solid #444444; border-radius: 4px; }
             """)
-
-    def setup_theme_switcher(self):
-        theme_switcher_layout = QHBoxLayout()
-        self.theme_selector = QComboBox()
-        self.theme_selector.addItems(["Light", "Dark"])
-        self.theme_selector.currentIndexChanged.connect(self.change_theme)
-        theme_switcher_layout.addWidget(QLabel("Theme:"))
-        theme_switcher_layout.addWidget(self.theme_selector)
-        self.layout.addLayout(theme_switcher_layout)
 
     def change_theme(self, index):
         self.current_theme = "dark" if index == 1 else "light"
@@ -134,6 +124,15 @@ class MainWindow(QMainWindow):
         download_dir_layout.addRow(self.download_dir_save)
         download_dir_group.setLayout(download_dir_layout)
         settings_layout.addWidget(download_dir_group)
+
+        theme_group = QGroupBox("Theme")
+        theme_layout = QFormLayout()
+        self.theme_selector = QComboBox()
+        self.theme_selector.addItems(["Light", "Dark"])
+        self.theme_selector.currentIndexChanged.connect(self.change_theme)
+        theme_layout.addRow("Select Theme:", self.theme_selector)
+        theme_group.setLayout(theme_layout)
+        settings_layout.addWidget(theme_group)
 
         settings_layout.addStretch(1)
         self.tabs.addTab(settings_tab, "Settings")
