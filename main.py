@@ -53,19 +53,21 @@ class Settings:
     def __init__(self):
         self.api_key = ""
         self.default_download_dir = ""
+        self.theme = "light"
         self.load_settings()
 
     def load_settings(self):
         if os.path.exists("settings.txt"):
             with open("settings.txt", "r") as f:
                 lines = f.readlines()
-                if len(lines) >= 2:
+                if len(lines) >= 3:
                     self.api_key = lines[0].strip()
                     self.default_download_dir = lines[1].strip()
+                    self.theme = lines[2].strip()
 
     def save_settings(self):
         with open("settings.txt", "w") as f:
-            f.write(f"{self.api_key}\n{self.default_download_dir}")
+            f.write(f"{self.api_key}\n{self.default_download_dir}\n{self.theme}")
 
 def main():
     app = QApplication(sys.argv)
@@ -77,6 +79,7 @@ def main():
     worker = WorkerThread(api)
 
     # Connect signals
+    window.theme_signal.connect(lambda theme: setattr(settings, 'theme', theme))
     window.search_signal.connect(worker.search)
     window.download_signal.connect(worker.download)
     window.inference_signal.connect(worker.inference)
@@ -93,6 +96,7 @@ def main():
     # Load initial settings
     window.api_key_input.setText(settings.api_key)
     window.download_dir_input.setText(settings.default_download_dir)
+    window.theme_selector.setCurrentIndex(1 if settings.theme == "dark" else 0)
 
     # Save settings on close
     app.aboutToQuit.connect(settings.save_settings)

@@ -6,6 +6,7 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont, QPalette, QColor
 
 class MainWindow(QMainWindow):
+    theme_signal = pyqtSignal(str)
     search_signal = pyqtSignal(str, dict)
     download_signal = pyqtSignal(str, str)
     api_key_signal = pyqtSignal(str)
@@ -13,6 +14,7 @@ class MainWindow(QMainWindow):
     inference_signal = pyqtSignal(str, str)
 
     def __init__(self):
+        self.current_theme = "light"
         super().__init__()
         self.setWindowTitle("Hugging Face Hub Explorer")
         self.setGeometry(100, 100, 1000, 700)
@@ -22,7 +24,8 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(self.central_widget)
         self.layout = QVBoxLayout(self.central_widget)
 
-        self.tabs = QTabWidget()
+        self.tabs = QTabWidget(self.central_widget)
+        self.setup_theme_switcher()
         self.layout.addWidget(self.tabs)
 
         self.setup_search_tab()
@@ -30,43 +33,42 @@ class MainWindow(QMainWindow):
         self.setup_inference_tab()
 
     def setup_style(self):
-        self.setStyleSheet("""
-            QMainWindow {
-                background-color: #f0f0f0;
-            }
-            QTabWidget::pane {
-                border: 1px solid #cccccc;
-                background-color: #ffffff;
-            }
-            QTabBar::tab {
-                background-color: #e0e0e0;
-                padding: 8px 16px;
-                margin-right: 2px;
-            }
-            QTabBar::tab:selected {
-                background-color: #ffffff;
-                border-bottom: 2px solid #4a86e8;
-            }
-            QPushButton {
-                background-color: #4a86e8;
-                color: white;
-                padding: 8px 16px;
-                border: none;
-                border-radius: 4px;
-            }
-            QPushButton:hover {
-                background-color: #3a76d8;
-            }
-            QLineEdit, QComboBox {
-                padding: 6px;
-                border: 1px solid #cccccc;
-                border-radius: 4px;
-            }
-            QListWidget {
-                border: 1px solid #cccccc;
-                border-radius: 4px;
-            }
-        """)
+        if self.current_theme == "light":
+            self.setStyleSheet("""
+                QMainWindow { background-color: #f0f0f0; }
+                QTabWidget::pane { border: 1px solid #cccccc; background-color: #ffffff; }
+                QTabBar::tab { background-color: #e0e0e0; padding: 8px 16px; margin-right: 2px; }
+                QTabBar::tab:selected { background-color: #ffffff; border-bottom: 2px solid #4a86e8; }
+                QPushButton { background-color: #4a86e8; color: white; padding: 8px 16px; border: none; border-radius: 4px; }
+                QPushButton:hover { background-color: #3a76d8; }
+                QLineEdit, QComboBox { padding: 6px; border: 1px solid #cccccc; border-radius: 4px; }
+                QListWidget { border: 1px solid #cccccc; border-radius: 4px; }
+            """)
+        else:
+            self.setStyleSheet("""
+                QMainWindow { background-color: #2e2e2e; }
+                QTabWidget::pane { border: 1px solid #444444; background-color: #3c3c3c; }
+                QTabBar::tab { background-color: #4a4a4a; padding: 8px 16px; margin-right: 2px; }
+                QTabBar::tab:selected { background-color: #3c3c3c; border-bottom: 2px solid #76a9ea; }
+                QPushButton { background-color: #76a9ea; color: white; padding: 8px 16px; border: none; border-radius: 4px; }
+                QPushButton:hover { background-color: #6598d8; }
+                QLineEdit, QComboBox { padding: 6px; border: 1px solid #444444; border-radius: 4px; }
+                QListWidget { border: 1px solid #444444; border-radius: 4px; }
+            """)
+
+    def setup_theme_switcher(self):
+        theme_switcher_layout = QHBoxLayout()
+        self.theme_selector = QComboBox()
+        self.theme_selector.addItems(["Light", "Dark"])
+        self.theme_selector.currentIndexChanged.connect(self.change_theme)
+        theme_switcher_layout.addWidget(QLabel("Theme:"))
+        theme_switcher_layout.addWidget(self.theme_selector)
+        self.layout.addLayout(theme_switcher_layout)
+
+    def change_theme(self, index):
+        self.current_theme = "dark" if index == 1 else "light"
+        self.setup_style()
+        self.theme_signal.emit(self.current_theme)
 
     def setup_search_tab(self):
         search_tab = QWidget()
@@ -213,4 +215,4 @@ class MainWindow(QMainWindow):
         QMessageBox.information(self, title, message)
     
     def update_inference_output(self, result):
-        self.output_text.setPlainText(str(result))    
+        self.output_text.setPlainText(str(result))
