@@ -47,12 +47,13 @@ class MainWindow(QMainWindow):
             self.setStyleSheet("""
                 QMainWindow { background-color: #2e2e2e; }
                 QTabWidget::pane { border: 1px solid #444444; background-color: #3c3c3c; color: #e0e0e0; }
-                QTabBar::tab { background-color: #4a4a4a; padding: 8px 16px; margin-right: 2px; }
+                QTabBar::tab { background-color: #4a4a4a; padding: 8px 16px; margin-right: 2px; color: #e0e0e0; }
                 QTabBar::tab:selected { background-color: #3c3c3c; border-bottom: 2px solid #76a9ea; }
                 QPushButton { background-color: #76a9ea; color: white; padding: 8px 16px; border: none; border-radius: 4px; }
                 QPushButton:hover { background-color: #6598d8; }
-                QLineEdit, QComboBox { padding: 6px; border: 1px solid #444444; border-radius: 4px; }
-                QListWidget { border: 1px solid #444444; border-radius: 4px; }
+                QLineEdit, QComboBox { padding: 6px; border: 1px solid #444444; border-radius: 4px; color: #e0e0e0; background-color: #2e2e2e; }
+                QListWidget { border: 1px solid #444444; border-radius: 4px; color: #e0e0e0; background-color: #2e2e2e; }
+                QLabel { color: #e0e0e0; }
             """)
 
     def change_theme(self, index):
@@ -144,12 +145,14 @@ class MainWindow(QMainWindow):
         model_layout = QHBoxLayout()
         self.model_input = QLineEdit()
         self.model_input.setPlaceholderText("Enter model ID")
+        self.model_input.setToolTip("Enter the model ID (e.g., 'microsoft/phi-3.5-medium')")
         model_layout.addWidget(QLabel("Model ID:"))
         model_layout.addWidget(self.model_input)
         inference_layout.addLayout(model_layout)
 
         self.input_text = QTextEdit()
         self.input_text.setPlaceholderText("Enter input text or data")
+        self.input_text.setToolTip("Enter the input text or data for the model to process")
         inference_layout.addWidget(QLabel("Input:"))
         inference_layout.addWidget(self.input_text)
 
@@ -204,7 +207,8 @@ class MainWindow(QMainWindow):
 
     def update_results(self, results):
         self.results_list.clear()
-        for result in results:
+        sorted_results = sorted(results, key=lambda x: x['id'].lower())
+        for result in sorted_results:
             self.results_list.addItem(result['id'])
 
     def update_progress(self, value):
