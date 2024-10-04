@@ -22,8 +22,8 @@ Hugging Face Hub App is a desktop application built with PyQt6 that allows users
 
 1. Clone the repository:
    ```bash
-   git clone <repository-url>
-   cd <repository-directory>
+   git clone https://github.com/mixelpixx/HF-APP
+   cd mixelpixx/HF-APP
    ```
 
 2. Create a virtual environment:
