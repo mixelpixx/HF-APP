@@ -1,12 +1,14 @@
 import requests
 import os
 from typing import Dict, List, Optional
+import threading
 
 class HuggingFaceAPI:
     def __init__(self, api_key: str):
         self.api_key = api_key
         self.base_url = "https://huggingface.co/api"
         self.headers = {"Authorization": f"Bearer {self.api_key}"}
+        self.cancel_download = False
 
     def search_models(self, query: str, filters: Optional[Dict] = None) -> List[Dict]:
         url = f"{self.base_url}/models"
@@ -18,6 +20,7 @@ class HuggingFaceAPI:
         return response.json()
 
     def download_model(self, model_id: str, download_dir: str) -> str:
+        self.cancel_download = False
         url = f"{self.base_url}/models/{model_id}/download"
         response = requests.get(url, headers=self.headers, stream=True)
         response.raise_for_status()
@@ -29,6 +32,8 @@ class HuggingFaceAPI:
         filepath = os.path.join(download_dir, filename)
         with open(filepath, 'wb') as f:
             for chunk in response.iter_content(chunk_size=8192):
+                if self.cancel_download:
+                    break
                 f.write(chunk)
         return filepath
 
@@ -56,4 +61,4 @@ class HuggingFaceAPI:
         url = f"https://api-inference.huggingface.co/models/{model_id}"
         response = requests.post(url, headers=self.headers, json={"inputs": inputs})
         response.raise_for_status()
-        return response.json()    
+        return response.json()
