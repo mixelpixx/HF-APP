@@ -4,14 +4,12 @@ from PyQt6.QtWidgets import QApplication
 from PyQt6.QtCore import QThread, pyqtSignal
 from gui import MainWindow
 from huggingface_api import HuggingFaceAPI
-import json
 
 class WorkerThread(QThread):
     result_signal = pyqtSignal(list)
     progress_signal = pyqtSignal(int)
     message_signal = pyqtSignal(str, str)
     inference_result_signal = pyqtSignal(dict)
-    cancel_signal = pyqtSignal()
 
     def __init__(self, api):
         super().__init__()
@@ -23,14 +21,12 @@ class WorkerThread(QThread):
         if self.task == "search":
             results = self.api.search_models(*self.args)
             self.result_signal.emit(results)
-            self.progress_signal.emit(100)
         elif self.task == "download":
             try:
                 filepath = self.api.download_model(*self.args)
                 self.message_signal.emit("Download Complete", f"Model downloaded to: {filepath}")
             except Exception as e:
                 self.message_signal.emit("Download Error", str(e))
-                self.progress_signal.emit(0)
         elif self.task == "inference":
             try:
                 result = self.api.run_inference(*self.args)
@@ -45,7 +41,6 @@ class WorkerThread(QThread):
 
     def download(self, model_id, download_dir):
         self.task = "download"
-        self.api.cancel_download = False
         self.args = (model_id, download_dir)
         self.start()
 
@@ -54,16 +49,11 @@ class WorkerThread(QThread):
         self.args = (model_id, inputs)
         self.start()
 
-    def cancel_download(self):
-        self.api.cancel_download = True
-        self.progress_signal.emit(0)
-
 class Settings:
     def __init__(self):
         self.api_key = ""
         self.default_download_dir = ""
         self.theme = "light"
-        self.search_history = []
         self.load_settings()
 
     def load_settings(self):
@@ -74,11 +64,10 @@ class Settings:
                     self.api_key = lines[0].strip()
                     self.default_download_dir = lines[1].strip()
                     self.theme = lines[2].strip()
-                    self.search_history = json.loads(lines[3].strip())
 
     def save_settings(self):
         with open("settings.txt", "w") as f:
-            f.write(f"{self.api_key}\n{self.default_download_dir}\n{self.theme}\n{json.dumps(self.search_history)}")
+            f.write(f"{self.api_key}\n{self.default_download_dir}\n{self.theme}")
 
 def main():
     app = QApplication(sys.argv)
@@ -98,7 +87,6 @@ def main():
     worker.progress_signal.connect(window.update_progress)
     worker.message_signal.connect(window.show_message)
     worker.inference_result_signal.connect(window.update_inference_output)
-    window.cancel_download_signal.connect(worker.cancel_download)
 
     # Connect settings signals
     window.api_key_signal.connect(lambda key: setattr(settings, 'api_key', key))
