@@ -1,6 +1,7 @@
 import requests
 import os
 from typing import Dict, List, Optional
+from huggingface_hub import hf_hub_download, snapshot_download
 
 class HuggingFaceAPI:
     def __init__(self, api_key: str):
@@ -17,20 +18,27 @@ class HuggingFaceAPI:
         response.raise_for_status()
         return response.json()
 
-    def download_model(self, model_id: str, download_dir: str) -> str:
-        url = f"{self.base_url}/models/{model_id}/download"
-        response = requests.get(url, headers=self.headers, stream=True)
-        response.raise_for_status()
-        
-        filename = response.headers.get('Content-Disposition', '').split('filename=')[-1]
-        if not filename:
-            filename = f"{model_id.split('/')[-1]}.tar.gz"
-        
-        filepath = os.path.join(download_dir, filename)
-        with open(filepath, 'wb') as f:
-            for chunk in response.iter_content(chunk_size=8192):
-                f.write(chunk)
-        return filepath
+    def download_model(self, model_id: str, download_dir: str, progress_callback=None) -> str:
+        try:
+            # Create the download directory if it doesn't exist
+            os.makedirs(download_dir, exist_ok=True)
+            
+            # Download the complete model snapshot
+            local_dir = snapshot_download(
+                repo_id=model_id,
+                token=self.api_key,
+                local_dir=os.path.join(download_dir, model_id.split('/')[-1]),
+                local_dir_use_symlinks=False,
+                resume_download=True,
+                ignore_patterns=["*.safetensors", "*.bin"] if "text-generation" not in model_id else None,
+                max_workers=4
+            )
+            
+            if progress_callback:
+                progress_callback(100)
+            return local_dir
+        except Exception as e:
+            raise Exception(f"Failed to download model: {str(e)}")
 
     def get_model_info(self, model_id: str) -> Dict:
         url = f"{self.base_url}/models/{model_id}"
@@ -56,4 +64,4 @@ class HuggingFaceAPI:
         url = f"https://api-inference.huggingface.co/models/{model_id}"
         response = requests.post(url, headers=self.headers, json={"inputs": inputs})
         response.raise_for_status()
-        return response.json()    
+        return response.json()
