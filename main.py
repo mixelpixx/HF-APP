@@ -24,10 +24,10 @@ class WorkerThread(QThread):
         elif self.task == "download":
             try:
                 def progress_callback(progress):
-                    self.progress_signal.emit(progress)
+                    self.progress_signal.emit(int(progress))
                 
-                filepath = self.api.download_model(*self.args, progress_callback=progress_callback)
-                self.message_signal.emit("Download Complete", f"Model downloaded to: {filepath}")
+                result = self.api.download_model(*self.args, progress_callback=progress_callback)
+                self.message_signal.emit("Download Complete", f"Model downloaded to: {result['local_dir']}\nFiles: {len(result['files'])}")
             except Exception as e:
                 self.message_signal.emit("Download Error", str(e))
                 self.progress_signal.emit(0)

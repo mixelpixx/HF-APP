@@ -1,6 +1,7 @@
 import requests
 import os
 from typing import Dict, List, Optional
+from tqdm import tqdm
 from huggingface_hub import hf_hub_download, snapshot_download
 
 class HuggingFaceAPI:
@@ -18,25 +19,31 @@ class HuggingFaceAPI:
         response.raise_for_status()
         return response.json()
 
-    def download_model(self, model_id: str, download_dir: str, progress_callback=None) -> str:
+    def download_model(self, model_id: str, download_dir: str, progress_callback=None) -> Dict[str, str]:
         try:
-            # Create the download directory if it doesn't exist
             os.makedirs(download_dir, exist_ok=True)
+            local_dir = os.path.join(download_dir, model_id.split('/')[-1])
             
-            # Download the complete model snapshot
-            local_dir = snapshot_download(
-                repo_id=model_id,
-                token=self.api_key,
-                local_dir=os.path.join(download_dir, model_id.split('/')[-1]),
-                local_dir_use_symlinks=False,
-                resume_download=True,
-                ignore_patterns=["*.safetensors", "*.bin"] if "text-generation" not in model_id else None,
-                max_workers=4
-            )
-            
-            if progress_callback:
-                progress_callback(100)
-            return local_dir
+            files = self.list_model_files(model_id)
+            total_files = len(files)
+            downloaded_files = []
+
+            for idx, file in enumerate(files, 1):
+                try:
+                    file_path = hf_hub_download(
+                        repo_id=model_id,
+                        filename=file,
+                        token=self.api_key,
+                        local_dir=local_dir,
+                        resume_download=True
+                    )
+                    downloaded_files.append(file_path)
+                    if progress_callback:
+                        progress_callback(int((idx / total_files) * 100))
+                except Exception as e:
+                    print(f"Error downloading {file}: {str(e)}")
+
+            return {"local_dir": local_dir, "files": downloaded_files}
         except Exception as e:
             raise Exception(f"Failed to download model: {str(e)}")
 
