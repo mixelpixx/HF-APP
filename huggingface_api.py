@@ -1,15 +1,15 @@
-import requests
+import subprocess
 import os
 from typing import Dict, List, Optional
 import logging
-from huggingface_hub import hf_hub_download, snapshot_download
-from urllib3.exceptions import RequestError
+import json
+import shutil
 
 class HuggingFaceAPI:
     def __init__(self, api_key: str):
         self.api_key = api_key
-        self.base_url = "https://huggingface.co/api"
-        self._headers = None
+        self._cli_env = os.environ.copy()
+        self._cli_env["HUGGINGFACE_TOKEN"] = api_key
         self.setup_logging()
         self.validate_api_key()
 
@@ -23,60 +23,76 @@ class HuggingFaceAPI:
         logging.info("Logging initialized for HuggingFace API")
 
     def validate_api_key(self):
-        """Validate API key by making a test request"""
+        """Validate API key using huggingface-cli"""
         try:
-            self.search_models("test", limit=1)
+            result = subprocess.run(
+                ["huggingface-cli", "whoami"],
+                env=self._cli_env,
+                capture_output=True,
+                text=True
+            )
+            if result.returncode != 0:
+                raise ValueError(f"API key validation failed: {result.stderr}")
         except Exception as e:
             logging.error(f"Invalid API key or connection error: {str(e)}")
             raise ValueError("Invalid API key or unable to connect to Hugging Face API")
 
     def search_models(self, query: str, filters: Optional[Dict] = None) -> List[Dict]:
-        url = f"{self.base_url}/models"
-        params = {"search": query}
+        cmd = ["huggingface-cli", "search", query, "--filter=model"]
         try:
             if filters:
-                params.update(filters)
+                if filters.get("task"):
+                    cmd.extend(["--filter", f"task={filters['task']}"])
+                if filters.get("library"):
+                    cmd.extend(["--filter", f"library={filters['library']}"])
+            
+            result = subprocess.run(
+                cmd,
+                env=self._cli_env,
+                capture_output=True,
+                text=True
+            )
+            if result.returncode != 0:
+                raise Exception(f"Search failed: {result.stderr}")
+                
+            # Parse the output into the expected format
+            models = []
+            for line in result.stdout.split('\n'):
+                if line.strip():
+                    models.append({"id": line.strip()})
+            return models
         except Exception as e:
             logging.error(f"Error processing filters: {str(e)}")
             raise ValueError("Invalid filter parameters")
 
-        response = requests.get(url, headers=self._headers, params=params)
-        response.raise_for_status()
-        return response.json()
-
     def download_model(self, model_id: str, download_dir: str, progress_callback=None) -> Dict[str, str]:
-        try:
-            os.makedirs(download_dir, exist_ok=True)
-        except PermissionError:
-            logging.error(f"Permission denied creating directory: {download_dir}")
-            raise PermissionError(f"Unable to create download directory: {download_dir}")
-        except Exception as e:
-            logging.error(f"Error creating directory: {str(e)}")
-            raise
-
-        logging.info(f"Starting download of model: {model_id}")
+        os.makedirs(download_dir, exist_ok=True)
         local_dir = os.path.join(download_dir, model_id.replace('/', '--'))
+ 
+        logging.info(f"Starting download of model: {model_id}")
 
         try:
-            # First try to get model info to verify it exists
-            self.get_model_info(model_id)
-            logging.info(f"Model {model_id} found, proceeding with download")
-        except Exception as e:
-            logging.error(f"Model {model_id} not found: {str(e)}")
-            raise Exception(f"Model not found: {str(e)}")
-
-        try:
-            result = snapshot_download(
-                repo_id=model_id,
-                token=self.api_key,
-                local_dir=local_dir,
-                local_dir_use_symlinks=False,
-                resume_download=True
+            cmd = [
+                "huggingface-cli", "download",
+                model_id,
+                "--local-dir", local_dir
+            ]
+            
+            process = subprocess.Popen(
+                cmd,
+                env=self._cli_env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                universal_newlines=True
             )
-            logging.info(f"Download completed successfully to: {result}")
+            stdout, stderr = process.communicate()
+            if process.returncode != 0:
+                logging.error(f"Error during download: {stderr}")
+                raise Exception(f"Download failed: {stderr}")
+            logging.info(f"Download completed successfully to: {local_dir}")
             if progress_callback:
                 progress_callback(100)
-            return {"local_dir": result, "success": True}
+            return {"local_dir": local_dir, "success": True}
         except Exception as e:
             logging.error(f"Error during download: {str(e)}")
             if progress_callback:
@@ -84,16 +100,28 @@ class HuggingFaceAPI:
             raise Exception(f"Download failed: {str(e)}")
 
     def get_model_info(self, model_id: str) -> Dict:
-        url = f"{self.base_url}/models/{model_id}"
-        response = requests.get(url, headers=self._headers)
-        response.raise_for_status()
-        return response.json()
+        cmd = ["huggingface-cli", "info", model_id]
+        result = subprocess.run(
+            cmd,
+            env=self._cli_env,
+            capture_output=True,
+            text=True
+        )
+        if result.returncode != 0:
+            raise Exception(f"Failed to get model info: {result.stderr}")
+        return json.loads(result.stdout)
 
     def list_model_files(self, model_id: str) -> List[str]:
-        url = f"{self.base_url}/models/{model_id}/tree"
-        response = requests.get(url, headers=self._headers)
-        response.raise_for_status()
-        return response.json()
+        cmd = ["huggingface-cli", "files", model_id]
+        result = subprocess.run(
+            cmd,
+            env=self._cli_env,
+            capture_output=True,
+            text=True
+        )
+        if result.returncode != 0:
+            raise Exception(f"Failed to list model files: {result.stderr}")
+        return result.stdout.splitlines()
 
     def get_model_tags(self, model_id: str) -> List[str]:
         model_info = self.get_model_info(model_id)
