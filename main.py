@@ -1,6 +1,7 @@
 import sys
 import os
 from PyQt6.QtWidgets import QApplication
+from PyQt6.QtWidgets import QMessageBox
 from PyQt6.QtCore import QThread, pyqtSignal
 from gui import MainWindow
 from huggingface_api import HuggingFaceAPI
@@ -19,8 +20,14 @@ class WorkerThread(QThread):
 
     def run(self):
         if self.task == "search":
-            results = self.api.search_models(*self.args)
-            self.result_signal.emit(results)
+            try:
+                results = self.api.search_models(*self.args)
+                self.result_signal.emit(results)
+            except Exception as e:
+                self.message_signal.emit(
+                    "Search Error",
+                    f"Failed to search models: {str(e)}"
+                )
         elif self.task == "download":
             try:
                 def progress_callback(progress):
@@ -79,8 +86,15 @@ class Settings:
 def main():
     app = QApplication(sys.argv)
     
-    settings = Settings()
-    api = HuggingFaceAPI(settings.api_key)
+    try:
+        settings = Settings()
+        api = HuggingFaceAPI(settings.api_key)
+    except ValueError as e:
+        QMessageBox.critical(None, "API Error", str(e))
+        return
+    except Exception as e:
+        QMessageBox.critical(None, "Initialization Error", f"Failed to start application: {str(e)}")
+        return
     
     window = MainWindow()
     worker = WorkerThread(api)
