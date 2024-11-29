@@ -1,15 +1,21 @@
 import requests
 import os
 from typing import Dict, List, Optional
-from tqdm import tqdm
+import logging
 from huggingface_hub import hf_hub_download, snapshot_download
 
 class HuggingFaceAPI:
     def __init__(self, api_key: str):
         self.api_key = api_key
         self.base_url = "https://huggingface.co/api"
-        self.headers = {"Authorization": f"Bearer {self.api_key}"}
+        self.setup_logging()
 
+    def setup_logging(self):
+        logging.basicConfig(level=logging.INFO,
+                          format='%(asctime)s - %(levelname)s - %(message)s',
+                          handlers=[logging.StreamHandler(),
+                                  logging.FileHandler('hf_downloads.log')])
+ 
     def search_models(self, query: str, filters: Optional[Dict] = None) -> List[Dict]:
         url = f"{self.base_url}/models"
         params = {"search": query}
@@ -22,28 +28,34 @@ class HuggingFaceAPI:
     def download_model(self, model_id: str, download_dir: str, progress_callback=None) -> Dict[str, str]:
         try:
             os.makedirs(download_dir, exist_ok=True)
-            local_dir = os.path.join(download_dir, model_id.split('/')[-1])
-            
-            files = self.list_model_files(model_id)
-            total_files = len(files)
-            downloaded_files = []
-
-            for idx, file in enumerate(files, 1):
-                try:
-                    file_path = hf_hub_download(
-                        repo_id=model_id,
-                        filename=file,
-                        token=self.api_key,
-                        local_dir=local_dir,
-                        resume_download=True
-                    )
-                    downloaded_files.append(file_path)
-                    if progress_callback:
-                        progress_callback(int((idx / total_files) * 100))
-                except Exception as e:
-                    print(f"Error downloading {file}: {str(e)}")
-
-            return {"local_dir": local_dir, "files": downloaded_files}
+            logging.info(f"Starting download of model: {model_id}")
+            local_dir = os.path.join(download_dir, model_id.replace('/', '--'))
+ 
+            try:
+                # First try to get model info to verify it exists
+                self.get_model_info(model_id)
+                logging.info(f"Model {model_id} found, proceeding with download")
+            except Exception as e:
+                logging.error(f"Model {model_id} not found: {str(e)}")
+                raise Exception(f"Model not found: {str(e)}")
+ 
+            try:
+                result = snapshot_download(
+                    repo_id=model_id,
+                    token=self.api_key,
+                    local_dir=local_dir,
+                    local_dir_use_symlinks=False,
+                    resume_download=True
+                )
+                logging.info(f"Download completed successfully to: {result}")
+                if progress_callback:
+                    progress_callback(100)
+                return {"local_dir": result, "success": True}
+            except Exception as e:
+                logging.error(f"Error during download: {str(e)}")
+                if progress_callback:
+                    progress_callback(0)
+                raise Exception(f"Download failed: {str(e)}")
         except Exception as e:
             raise Exception(f"Failed to download model: {str(e)}")
 
