@@ -13,6 +13,15 @@ class HuggingFaceAPI:
         self.setup_logging()
         self.validate_api_key()
 
+    def setup_logging(self):
+        """Configure logging for the API class"""
+        logging.basicConfig(
+            level=logging.INFO,
+            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+            handlers=[logging.StreamHandler()]
+        )
+        logging.info("Logging initialized for HuggingFace API")
+
     def validate_api_key(self):
         """Validate API key by making a test request"""
         try:
