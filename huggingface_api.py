@@ -55,3 +55,57 @@ class HuggingFaceAPI:
         except Exception as e:
             logging.error(f"Error searching models: {str(e)}")
             raise
+
+    def download_model(self, model_id: str, download_dir: str, progress_callback=None) -> Dict[str, str]:
+        try:
+            os.makedirs(download_dir, exist_ok=True)
+            local_dir = os.path.join(download_dir, model_id.split('/')[-1])
+             
+            cmd = [
+                "huggingface-cli", "download",
+                model_id,
+                "--local-dir", local_dir
+            ]
+            
+            process = subprocess.Popen(
+                cmd,
+                env=self._cli_env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                universal_newlines=True
+            )
+
+            # Handle progress tracking if needed
+            if progress_callback:
+                for line in process.stdout:
+                    progress_callback(line)
+
+            stdout, stderr = process.communicate()
+            if process.returncode != 0:
+                raise ValueError(f"Download failed: {stderr}")
+            return {"local_dir": local_dir, "stdout": stdout.strip()}
+        except Exception as e:
+            logging.error(f"Error downloading model: {str(e)}")
+            raise
+
+    def run_inference(self, model_id: str, input_text: str) -> Dict:
+        """Run inference on a model"""
+        try:
+            cmd = [
+                "huggingface-cli", "run-inference",
+                model_id,
+                "--inputs", input_text
+            ]
+            
+            result = subprocess.run(
+                cmd,
+                env=self._cli_env,
+                capture_output=True,
+                text=True,
+                check=True
+            )
+            
+            return {"output": result.stdout.strip()}
+        except Exception as e:
+            logging.error(f"Error running inference: {str(e)}")
+            raise
