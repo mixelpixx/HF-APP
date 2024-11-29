@@ -8,8 +8,14 @@ class HuggingFaceAPI:
     def __init__(self, api_key: str):
         self.api_key = api_key
         self.base_url = "https://huggingface.co/api"
-        self.headers = {"Authorization": f"Bearer {self.api_key}"}
+        self._headers = None
         self.setup_logging()
+
+    @property
+    def headers(self):
+        if self._headers is None:
+            self._headers = {"Authorization": f"Bearer {self.api_key}"}
+        return self._headers
 
     def setup_logging(self):
         logging.basicConfig(level=logging.INFO,
