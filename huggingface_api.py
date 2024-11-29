@@ -8,6 +8,7 @@ class HuggingFaceAPI:
     def __init__(self, api_key: str):
         self.api_key = api_key
         self.base_url = "https://huggingface.co/api"
+        self.headers = {"Authorization": f"Bearer {self.api_key}"}
         self.setup_logging()
 
     def setup_logging(self):
@@ -22,6 +23,7 @@ class HuggingFaceAPI:
         if filters:
             params.update(filters)
         response = requests.get(url, headers=self.headers, params=params)
+
         response.raise_for_status()
         return response.json()
 
