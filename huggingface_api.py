@@ -1,92 +1,42 @@
-import subprocess
+import requests
 import logging
 import os
 from typing import Dict, List, Optional
+from urllib.parse import urljoin
 
 class HuggingFaceAPI:
     def __init__(self, api_key: str):
         self.api_key = api_key
-        self._cli_env = os.environ.copy()
-        if api_key:
-            self._cli_env["HUGGINGFACE_TOKEN"] = api_key
-            self.validate_api_key()
-
-    def validate_api_key(self):
-        """Validate API key using huggingface-cli whoami"""
-        try:
-            result = subprocess.run(
-                ["huggingface-cli", "whoami"],
-                env=self._cli_env,
-                capture_output=True,
-                text=True
-            )
-            if result.returncode != 0:
-                raise ValueError(f"Invalid token: {result.stderr}")
-            logging.info("Successfully logged in to Hugging Face")
-        except Exception as e:
-            logging.error(f"Invalid API key or connection error: {str(e)}")
-            raise ValueError("Invalid API key or unable to connect to Hugging Face API")
+        self.base_url = "https://huggingface.co/api"
+        self.headers = {"Authorization": f"Bearer {api_key}"}
 
     def search_models(self, query: str, filters: Optional[Dict] = None) -> List[Dict]:
-        cmd = ["huggingface-cli", "search", query, "--filter=model"]
-         
+        url = f"{self.base_url}/models"
+        params = {"search": query}
+        if filters:
+            params.update(filters)
         try:
-            if filters:
-                if filters.get("task"):
-                    cmd.extend(["--filter", f"task={filters['task']}"])
-                if filters.get("library"):
-                    cmd.extend(["--filter", f"library={filters['library']}"])
-            
-            result = subprocess.run(
-                cmd,
-                env=self._cli_env,
-                capture_output=True,
-                text=True,
-                check=True
-            )
-            
-            # Parse the output and convert to list of dicts
-            models = []
-            for line in result.stdout.strip().split('\n'):
-                if line.strip():
-                    models.append({"id": line.strip()})
-            return models
+            response = requests.get(url, headers=self.headers, params=params)
+            response.raise_for_status()
+            return response.json()
         except Exception as e:
             logging.error(f"Error searching models: {str(e)}")
             raise
 
-    def download_model(self, model_id: str, download_dir: str, progress_callback=None) -> Dict[str, str]:
-        try:
-            os.makedirs(download_dir, exist_ok=True)
-            local_dir = os.path.join(download_dir, model_id.replace('/', '--'))
-             
-            cmd = [
-                "huggingface-cli", "download",
-                model_id,
-                "--local-dir", local_dir,
-                "--token", self.api_key
-            ]
-            
-            process = subprocess.Popen(
-                cmd,
-                env=self._cli_env,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                universal_newlines=True
-            )
-
-            # Handle progress tracking if needed
-            if progress_callback:
-                for line in process.stdout:
-                    progress_callback(line)
-
-            stdout, stderr = process.communicate()
-            if process.returncode != 0:
-                raise ValueError(f"Download failed: {stderr}")
-            return {"local_dir": local_dir, "stdout": stdout.strip()}
-        except Exception as e:
-            logging.error(f"Error downloading model: {str(e)}")
-            raise
+    def download_model(self, model_id: str, download_dir: str) -> str:
+        url = f"{self.base_url}/models/{model_id}/download"
+        response = requests.get(url, headers=self.headers, stream=True)
+        response.raise_for_status()
+        
+        filename = response.headers.get('Content-Disposition', '').split('filename=')[-1]
+        if not filename:
+            filename = f"{model_id.split('/')[-1]}.tar.gz"
+        
+        filepath = os.path.join(download_dir, filename)
+        with open(filepath, 'wb') as f:
+            for chunk in response.iter_content(chunk_size=8192):
+                f.write(chunk)
+        return filepath
 
     def run_inference(self, model_id: str, input_text: str) -> Dict:
         """Run inference on a model"""
