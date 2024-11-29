@@ -40,7 +40,7 @@ class HuggingFaceAPI:
             logging.error(f"Error processing filters: {str(e)}")
             raise ValueError("Invalid filter parameters")
 
-        response = requests.get(url, headers=self.headers, params=params)
+        response = requests.get(url, headers=self._headers, params=params)
         response.raise_for_status()
         return response.json()
 
@@ -85,13 +85,13 @@ class HuggingFaceAPI:
 
     def get_model_info(self, model_id: str) -> Dict:
         url = f"{self.base_url}/models/{model_id}"
-        response = requests.get(url, headers=self.headers)
+        response = requests.get(url, headers=self._headers)
         response.raise_for_status()
         return response.json()
 
     def list_model_files(self, model_id: str) -> List[str]:
         url = f"{self.base_url}/models/{model_id}/tree"
-        response = requests.get(url, headers=self.headers)
+        response = requests.get(url, headers=self._headers)
         response.raise_for_status()
         return response.json()
 
@@ -105,6 +105,6 @@ class HuggingFaceAPI:
 
     def run_inference(self, model_id: str, inputs: str) -> Dict:
         url = f"https://api-inference.huggingface.co/models/{model_id}"
-        response = requests.post(url, headers=self.headers, json={"inputs": inputs})
+        response = requests.post(url, headers=self._headers, json={"inputs": inputs})
         response.raise_for_status()
         return response.json()
