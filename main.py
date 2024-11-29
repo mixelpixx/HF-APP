@@ -89,8 +89,12 @@ def main():
     try:
         settings = Settings()
         api = HuggingFaceAPI(settings.api_key)
+        if not settings.api_key:
+            QMessageBox.warning(None, "API Key Missing", 
+                "Please enter your Hugging Face API key in the Settings tab.")
     except ValueError as e:
-        QMessageBox.critical(None, "API Error", str(e))
+        QMessageBox.warning(None, "API Error", 
+            "Please check your API key in the Settings tab.")
         return
     except Exception as e:
         QMessageBox.critical(None, "Initialization Error", f"Failed to start application: {str(e)}")

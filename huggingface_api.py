@@ -1,28 +1,27 @@
 import subprocess
 import logging
 import os
-import json
 from typing import Dict, List, Optional
 
 class HuggingFaceAPI:
     def __init__(self, api_key: str):
         self.api_key = api_key
         self._cli_env = os.environ.copy()
-        self._cli_env["HUGGINGFACE_TOKEN"] = api_key
-        self.login()
+        if api_key:
+            self._cli_env["HUGGINGFACE_TOKEN"] = api_key
+            self.validate_api_key()
 
-    def login(self):
-        """Login using huggingface-cli"""
+    def validate_api_key(self):
+        """Validate API key using huggingface-cli whoami"""
         try:
-            # First try logging in with the token
-            login_process = subprocess.run(
-                ["huggingface-cli", "login", "--token", self.api_key],
+            result = subprocess.run(
+                ["huggingface-cli", "whoami"],
                 env=self._cli_env,
                 capture_output=True,
                 text=True
             )
-            if login_process.returncode != 0:
-                raise ValueError(f"Login failed: {login_process.stderr}")
+            if result.returncode != 0:
+                raise ValueError(f"Invalid token: {result.stderr}")
             logging.info("Successfully logged in to Hugging Face")
         except Exception as e:
             logging.error(f"Invalid API key or connection error: {str(e)}")
@@ -59,12 +58,13 @@ class HuggingFaceAPI:
     def download_model(self, model_id: str, download_dir: str, progress_callback=None) -> Dict[str, str]:
         try:
             os.makedirs(download_dir, exist_ok=True)
-            local_dir = os.path.join(download_dir, model_id.split('/')[-1])
+            local_dir = os.path.join(download_dir, model_id.replace('/', '--'))
              
             cmd = [
                 "huggingface-cli", "download",
                 model_id,
-                "--local-dir", local_dir
+                "--local-dir", local_dir,
+                "--token", self.api_key
             ]
             
             process = subprocess.Popen(
